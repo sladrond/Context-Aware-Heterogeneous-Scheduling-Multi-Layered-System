@@ -1,0 +1,161 @@
+import random 
+import time, sched, math
+import cv2
+from queue import Queue
+import glob
+import Task
+import pickle
+from PIL import Image 
+from torchvision import transforms
+import torch
+import sys
+import numpy as np
+
+
+files = glob.glob( "../data/images/*.jpg")
+
+class TaskGen:
+    def __init__(self):
+        pass
+           
+    def get_next_element(self,queue):
+        if not queue.empty():
+            return queue.get()
+        else:
+            print("No elements in the queue")
+
+    def next_time(self,rateParameter):
+            return random.expovariate(rateParameter)
+
+    def next_lambda(self,lambda_1=0.1, lambda_2=0.2, p=0.5):
+        num = random.random()
+
+        if num > p:
+            state=1 
+        else:
+            state=2
+        
+        if state == 1:
+            current_lambda=lambda_1
+        else:
+            current_lambda=lambda_2
+        
+        return current_lambda
+
+    def print_newt(self,i='10'):
+        print("New tasks has been generated at time ", time.time())
+
+    def add_newt(self,queue,task_type, task_data, min_score):
+        task1 = Task.Task(task_type, task_data,min_score)
+        try:
+                queue.put(task1)
+                #print("A new task has been added")
+                #print("q size " + str(queue.qsize()))
+                task1_string = pickle.dumps(task1)
+                import sys
+                #print("size of the task",sys.getsizeof(task1_string))
+        except:
+                print("Failed to load")
+    
+    def start(self, queue):
+        sch = sched.scheduler(time.time, time.sleep)
+        t_end = time.time() + 60 * 1
+        i=0
+        max_tasks = 100
+        while i<max_tasks:
+            c_lambda = self.next_lambda()
+            nt = self.next_time(10)
+            #Scheduling the next task
+            #(time, priority, function, arguments)
+            #print("lambda ",c_lambda)
+            #print("Next time ",nt)
+            #print("The time now is ", time.time())
+            task_min_score = 0.7
+            lambda_1 = 1/4
+
+            if random.random()>0.5:
+                #Trying images
+                #img_path = files[i]
+                #print("image_path ", img_path)
+                #image, original_image = load_image(img_url, image_size, dynamic_size, max_dynamic_size)
+                tfms = transforms.Compose([transforms.Resize(224), transforms.ToTensor(),
+                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),])
+                #img = cv2.imread(img_path)
+                #print(sys.path)
+                img=tfms(Image.open(('../data/images/000000001675.jpg'))).unsqueeze(0)
+                #img = Image.fromarray(image)
+                #print(img_path)
+                task_type= 'IMAGE_DET'
+                task_data= img
+            else:
+                task_type= 'TEXT'
+                task_data = ["Who was Jim Henson?", "Jim Henson was a nice puppet"]
+
+            sch.enter(nt,1, self.add_newt,argument=(queue,task_type, task_data, task_min_score))
+            sch.run()
+            i+=1
+                
+    def start_test(self, queue):
+        sch = sched.scheduler(time.time, time.sleep)
+        task_min_score = 0.7
+        lambda_1 = 1 / 4
+        # easy case, half and half
+        #type_0=np.zeros((50,))
+        #type_1=np.ones((50,))
+        #tasks=np.ravel((type_0,type_1))
+
+        #pattern to repeat
+        #pat=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,3,3,3,3]
+        freq_0=80
+        freq_3=20
+        cnt=0
+        tasks=[]
+        i=0
+        while i < 200:
+            if cnt == freq_0:
+                for j in range(freq_3):
+                	tasks.append(3)
+                	i+=1
+                cnt =0
+            else:
+                tasks.append(0)
+                i+=1
+                cnt+=1
+
+        #pat=[3,3,3]
+        #tasks=np.ravel([pat_0 for _ in range(100)])
+        print("tasks ", tasks)
+        print(len(tasks), " # of tasks")
+        i=0; j=0; k=0
+        #freq=[0.01,0.05,0.1,0.5,1]
+        #prob=[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,1]
+        delay=15
+        while True:
+            for i in range(len(tasks)):
+                if tasks[i] == 0:
+                    # Trying images
+                    # img_path = files[i]
+                    # print("image_path ", img_path)
+                    # image, original_image = load_image(img_url, image_size, dynamic_size, max_dynamic_size)
+                    tfms = transforms.Compose([transforms.Resize(224), transforms.ToTensor(),
+                                               transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]), ])
+                    # img = cv2.imread(img_path)
+                    # print(sys.path)
+                    img = tfms(Image.open(('../data/images/000000001675.jpg'))).unsqueeze(0)
+                    # img = Image.fromarray(image)
+                    # print(img_path)
+                    task_type = 'IMAGE_DET'
+                    task_data = img
+
+                elif tasks[i] == 1:
+                    task_type = 'TEXT'
+                    task_data = ["Who was Jim Henson?", "Jim Henson was a nice puppet"]
+
+                elif tasks[i] == 3:
+                    task_type = 'IMAGE_CLASS'
+                    img= transforms.ToTensor()(Image.open(('../data/images/000000001675.jpg')))
+                    task_data=img
+
+                sch.enter(delay, 1, self.add_newt, argument=(queue, task_type, task_data, task_min_score))
+                sch.run()
+

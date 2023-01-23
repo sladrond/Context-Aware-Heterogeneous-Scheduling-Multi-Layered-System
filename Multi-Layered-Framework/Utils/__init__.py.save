@@ -1,0 +1,60 @@
+import os
+import csv
+import numpy as np
+
+
+class ExpsReader:
+    def __init__(self, path, filename):
+        self.path = path
+        self.filename = filename
+
+    def convert_array(self, a):
+        if a[0] == '[':
+            b = np.zeros(len(a) - 2)  # Create a float array
+            b[0] = b[0] + float(a[1]);
+            b[len(b) - 1] = b[len(b) - 1] + float(a[len(a) - 2]);
+            start = 2
+        else:
+            b = np.zeros(len(a))  # Create a float array
+            b[0] = b[0] + float(a[0][1:]);
+            b[len(b) - 1] = b[len(b) - 1] + float(a[len(a) - 1][0:-1]);
+            start = 1
+
+        for j in range(start, len(b) - 1):
+            b[j] = b[j] + float(a[j])
+        return b
+
+    def get_exp(self, action, state):
+        folders = os.listdir(self.path)
+        for files in folders:
+            
+3print(files)
+            try:
+                parser = csv.reader(open(os.path.join(self.path, files, self.filename)), delimiter=',')
+                i = 0
+               
+                for l in parser:
+                    if i > 0:
+                        a = np.array(l[1].split())  # Split state line
+                        b = self.convert_array(a)
+                        #print(b)
+                        if np.array_equal(b, state) or np.allclose(b, state, atol=1e-01):
+                            if int(action) == int(l[2]):
+                                c = self.convert_array(np.array(l[4].split()))
+                                return c,float(l[3])
+                    i += 1
+                    #print("i: ",i)
+                    
+            except NotADirectoryError:
+                print("Not a directory exception")
+                return -1
+        return -1
+
+
+if __name__ == "__main__":
+    path = '/home/xavier/Documents/HeterogeneousTaskScheduler/ddqn_scheduler/logs/xavier-results/xavier-cc-2/'
+    filename = 'logs_exps.csv'
+    reader = ExpsReader(path, filename)
+    action = 12
+    state = np.zeros((42,))
+    print(reader.get_exp(state, action))
